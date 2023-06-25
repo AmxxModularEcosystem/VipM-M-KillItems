@@ -10,20 +10,25 @@
 #pragma semicolon 1
 #pragma compress 1
 
-public stock const PluginName[] = "[VipM][M] Kill Items";
-public stock const PluginVersion[] = "1.0.0";
+public stock const PluginName[] = "[VipM-M] Kill Items";
+public stock const PluginVersion[] = "1.1.0";
 public stock const PluginAuthor[] = "ArKaNeMaN";
-public stock const PluginURL[] = "https://arkanaplugins.ru/plugin/9";
+public stock const PluginURL[] = "t.me/arkanaplugins";
 public stock const PluginDescription[] = "Vip modular`s module - Kill Items";
 
 new const MODULE_NAME[] = "KillItems";
 
-public VipM_OnInitModules(){
+public VipM_OnInitModules() {
     register_plugin(PluginName, PluginVersion, PluginAuthor);
     
     VipM_Modules_Register(MODULE_NAME, true);
     VipM_Modules_AddParams(MODULE_NAME,
-        "Items", ptCustom, true,
+        "Items", ptCustom, false,
+        "DefaultItems", ptCustom, false,
+        "HeadItems", ptCustom, false,
+        "KnifeItems", ptCustom, false
+    );
+    VipM_Modules_AddParams(MODULE_NAME,
         "Limits", ptLimits, false
     );
     VipM_Modules_RegisterEvent(MODULE_NAME, Module_OnRead, "@OnReadConfig");
@@ -31,21 +36,25 @@ public VipM_OnInitModules(){
 }
 
 @OnReadConfig(const JSON:jCfg, Trie:Params) {
-    if(!json_object_has_value(jCfg, "Items")){
-        log_amx("[ERROR] Param `Items` required for module `%s`.", MODULE_NAME);
+    new Array:aItems = VipM_IC_JsonGetItems(json_object_get_value(jCfg, "Items"));
+    new Array:aDefaultItems = VipM_IC_JsonGetItems(json_object_get_value(jCfg, "DefaultItems"));
+    new Array:aHeadItems = VipM_IC_JsonGetItems(json_object_get_value(jCfg, "HeadItems"));
+    new Array:aKnifeItems = VipM_IC_JsonGetItems(json_object_get_value(jCfg, "KnifeItems"));
+
+    if (
+        ArraySizeSafe(aItems) < 1
+        && ArraySizeSafe(aDefaultItems) < 1
+        && ArraySizeSafe(aHeadItems) < 1
+        && ArraySizeSafe(aKnifeItems) < 1
+    ) {
+        VipM_Json_LogForFile(jCfg, "[WARNING] One of 'items' param must be filled.", MODULE_NAME);
         return VIPM_STOP;
     }
 
-    new JSON:jItems = json_object_get_value(jCfg, "Items");
-    new Array:aItems = VipM_IC_JsonGetItems(jItems);
-    json_free(jItems);
-
-    if(ArraySizeSafe(aItems) < 1){
-        ArrayDestroy(aItems);
-        log_amx("[WARNING] Param `Items` is empty.", MODULE_NAME);
-        return VIPM_STOP;
-    }
     TrieSetCell(Params, "Items", aItems);
+    TrieSetCell(Params, "DefaultItems", aDefaultItems);
+    TrieSetCell(Params, "HeadItems", aHeadItems);
+    TrieSetCell(Params, "KnifeItems", aKnifeItems);
 
     return VIPM_CONTINUE;
 }
@@ -55,11 +64,24 @@ public VipM_OnInitModules(){
 }
 
 @OnPlayerKilled(const VictimId, AttackerId, iGib) {
-    new Trie:Params = VipM_Modules_GetParams(MODULE_NAME, AttackerId);
+    new Trie:tParams = VipM_Modules_GetParams(MODULE_NAME, AttackerId);
 
-    if (!VipM_Params_ExecuteLimitsList(Params, "Limits", AttackerId, Limit_Exec_AND)) {
+    if (!VipM_Params_ExecuteLimitsList(tParams, "Limits", AttackerId, Limit_Exec_AND)) {
         return;
     }
 
-    VipM_IC_GiveItems(AttackerId, VipM_Params_GetArr(Params, "Items"));
+    VipM_IC_GiveItems(AttackerId, VipM_Params_GetArr(tParams, "Items"));
+    
+    new iActiveItemId = get_member(AttackerId, m_pActiveItem);
+    if (
+        !(get_member(VictimId, m_bitsDamageType) & DMG_SLASH)
+        && is_entity(iActiveItemId)
+        && rg_get_iteminfo(iActiveItemId, ItemInfo_iId) == CSW_KNIFE
+    ) {
+        VipM_IC_GiveItems(AttackerId, VipM_Params_GetArr(tParams, "KnifeItems"));
+    } else if (get_member(VictimId, m_bHeadshotKilled)) {
+        VipM_IC_GiveItems(AttackerId, VipM_Params_GetArr(tParams, "HeadItems"));
+    } else {
+        VipM_IC_GiveItems(AttackerId, VipM_Params_GetArr(tParams, "DefaultItems"));
+    }
 }
