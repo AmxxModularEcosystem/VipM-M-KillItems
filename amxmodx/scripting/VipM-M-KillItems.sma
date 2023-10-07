@@ -11,7 +11,7 @@
 #pragma compress 1
 
 public stock const PluginName[] = "[VipM-M] Kill Items";
-public stock const PluginVersion[] = "1.1.0";
+public stock const PluginVersion[] = "1.1.1";
 public stock const PluginAuthor[] = "ArKaNeMaN";
 public stock const PluginURL[] = "t.me/arkanaplugins";
 public stock const PluginDescription[] = "Vip modular`s module - Kill Items";
@@ -64,6 +64,10 @@ public VipM_OnInitModules() {
 }
 
 @OnPlayerKilled(const VictimId, AttackerId, iGib) {
+    if (!is_user_connected(AttackerId)) {
+        return;
+    }
+
     new Trie:tParams = VipM_Modules_GetParams(MODULE_NAME, AttackerId);
 
     if (!VipM_Params_ExecuteLimitsList(tParams, "Limits", AttackerId, Limit_Exec_AND)) {
